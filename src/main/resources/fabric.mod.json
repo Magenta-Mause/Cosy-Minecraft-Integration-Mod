@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "cosyintegrationmod",
+  "version": "${version}",
+  "name": "CosyIntegrationMod",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/cosyintegrationmod/icon.png",
+  "environment": "server",
+  "entrypoints": {
+    "fabric-datagen": [
+      "com.magentamause.cosyintegrationmod.client.CosyintegrationmodDataGenerator"
+    ],
+    "main": [
+      "com.magentamause.cosyintegrationmod.Cosyintegrationmod"
+    ]
+  },
+  "mixins": [
+    "cosyintegrationmod.mixins.json",
+    {
+      "config": "cosyintegrationmod.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
