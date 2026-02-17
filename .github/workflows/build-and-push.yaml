@@ -1,0 +1,69 @@
+name: Build & Release (main)
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build
+        run: ./gradlew clean build
+
+      - name: Locate mod jar
+        id: jars
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -la build/libs
+
+          # Pick the distributable jar (exclude dev + sources jars)
+          MAIN_JAR="$(ls -1 build/libs/*.jar | grep -vE '(-dev|-sources)\.jar$' | head -n 1 || true)"
+          if [[ -z "${MAIN_JAR}" ]]; then
+            echo "No main jar found in build/libs (excluding -dev and -sources)." >&2
+            exit 1
+          fi
+
+          # Optionally also include sources jar if present
+          SOURCES_JAR="$(ls -1 build/libs/*-sources.jar 2>/dev/null | head -n 1 || true)"
+
+          echo "main_jar=${MAIN_JAR}" >> "$GITHUB_OUTPUT"
+          echo "sources_jar=${SOURCES_JAR}" >> "$GITHUB_OUTPUT"
+
+      - name: Compute release tag/name
+        id: rel
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA::7}"
+          TAG="main-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "name=Automated build ${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release + upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          name: ${{ steps.rel.outputs.name }}
+          generate_release_notes: true
+          files: |
+            ${{ steps.jars.outputs.main_jar }}
+            ${{ steps.jars.outputs.sources_jar }}
