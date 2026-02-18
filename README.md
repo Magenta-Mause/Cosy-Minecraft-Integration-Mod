@@ -108,6 +108,20 @@ export COSY_METRICS_PERIOD_SECONDS="5"
 
 ---
 
+## Local testing (unofficial)
+
+While this mod is designed for the Cosy platform, you can test it with a local Fabric server.
+
+1.  Build the mod:
+    ```bash
+    ./gradlew clean build
+    ```
+2.  The JAR file will be in `build/libs/`. Look for the file **without** `-dev` or `-sources`.
+3.  Copy this JAR into your local Minecraft server's `mods` folder.
+4.  Set the environment variables as described above before starting your server.
+
+---
+
 ## Build / tech notes
 
 - Fabric Loom project (`fabric-loom`)
