@@ -32,6 +32,7 @@ public final class CosyClient {
         HttpRequest request = HttpRequest.newBuilder(config.customMetricsUri())
                 .timeout(Duration.ofSeconds(3))
                 .header("Content-Type", "application/json")
+                .header("Authorization", config.containerSecret())
                 .PUT(HttpRequest.BodyPublishers.ofString(metricsBody.toString()))
                 .build();
 
@@ -47,6 +48,7 @@ public final class CosyClient {
         HttpRequest request = HttpRequest.newBuilder(config.testConnectionUri())
                 .timeout(Duration.ofSeconds(3))
                 .header("Accept", "application/json")
+                .header("Authorization", config.containerSecret())
                 .GET()
                 .build();
 

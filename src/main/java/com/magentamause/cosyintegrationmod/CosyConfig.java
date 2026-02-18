@@ -22,14 +22,12 @@ public record CosyConfig(
 
     public URI customMetricsUri() {
         return URI.create(baseUrl + "/api/internal/game-server/custom-metric/"
-                + encodePathSegment(gameServerUuid) + "/"
-                + encodePathSegment(containerSecret));
+                + encodePathSegment(gameServerUuid));
     }
 
     public URI testConnectionUri() {
         return URI.create(baseUrl + "/api/internal/game-server/test-connection/"
-                + encodePathSegment(gameServerUuid) + "/"
-                + encodePathSegment(containerSecret));
+                + encodePathSegment(gameServerUuid));
     }
 
     private static String encodePathSegment(String s) {
