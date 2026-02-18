@@ -28,8 +28,8 @@ public final class MetricsPublisher {
 
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                var body = collector.collect(server);
-                client.putCustomMetricsAsync(body);
+                MetricsDto body = collector.collect(server);
+                client.putCustomMetricsAsync(body.toJsonObject());
             } catch (Exception ignored) {
                 // Intentionally quiet to avoid repeated log spam.
             }
