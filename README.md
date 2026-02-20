@@ -1,7 +1,6 @@
 # Cosy Minecraft Integration Mod
 
-A **Fabric server-side mod** that periodically collects basic Minecraft server metrics and **pushes them to the Cosy API
-** over HTTP.
+A **Fabric server-side mod** that periodically collects basic Minecraft server metrics and **pushes them to the Cosy API** over HTTP.
 
 ## What this project does
 
