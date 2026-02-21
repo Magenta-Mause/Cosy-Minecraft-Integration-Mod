@@ -13,6 +13,8 @@ public class Cosyintegrationmod implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        TickTimeTracker.init();
+
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             try {
                 CosyConfig config = CosyConfig.fromEnv();

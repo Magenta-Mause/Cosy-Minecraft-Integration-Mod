@@ -3,12 +3,112 @@ plugins {
     id 'maven-publish'
 }
 
+import groovy.json.JsonSlurper
+import groovy.xml.XmlSlurper
+import java.net.URLEncoder
+
+base {
+    // Include MC version in the jar name so multi-version builds don't overwrite each other.
+    archivesName = "${project.archives_base_name}-mc${project.minecraft_version}"
+}
+
+def versionKey = { String mcVersion -> mcVersion.replace(".", "_") }
+def mcVersions = (project.findProperty("minecraft_versions") ?: project.minecraft_version)
+        .split(",")
+        .collect { it.trim() }
+        .findAll { it }
+def versionProp = { String prefix, String mcVersion ->
+    def key = "${prefix}_${versionKey(mcVersion)}"
+    return project.findProperty(key) ?: project.findProperty(prefix)
+}
+
+def metaBase = "https://meta.fabricmc.net"
+def jsonSlurper = new JsonSlurper()
+def jsonCache = [:]
+def fetchJson = { String url ->
+    jsonCache.computeIfAbsent(url) {
+        new URL(url).withInputStream { stream -> jsonSlurper.parse(stream) }
+    }
+}
+
+def xmlCache = [:]
+def fetchXml = { String url ->
+    xmlCache.computeIfAbsent(url) {
+        new XmlSlurper().parse(url)
+    }
+}
+
+def resolveYarnVersion = { String mcVersion ->
+    def list = fetchJson("${metaBase}/v2/versions/yarn/${URLEncoder.encode(mcVersion, "UTF-8")}")
+    def stable = list.findAll { it.stable }
+    def pick = (stable ? stable : list)[0]
+    return pick?.version
+}
+
+def resolveLoaderVersion = { String mcVersion ->
+    def list = fetchJson("${metaBase}/v2/versions/loader/${URLEncoder.encode(mcVersion, "UTF-8")}")
+    def stable = list.findAll { it.loader?.stable }
+    def pick = (stable ? stable : list)[0]
+    return pick?.loader?.version
+}
+
+def resolveFabricApiVersion = { String mcVersion ->
+    def xml = fetchXml("https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/maven-metadata.xml")
+    def allVersions = xml.versioning.versions.version*.text()
+    def exact = allVersions.findAll { it.endsWith("+${mcVersion}") }
+    if (exact) {
+        return exact[-1]
+    }
+    def parts = mcVersion.split("\\.")
+    def majorMinor = parts.length >= 2 ? "${parts[0]}.${parts[1]}" : mcVersion
+    def majorMinorExact = allVersions.findAll { it.endsWith("+${majorMinor}") }
+    if (majorMinorExact) {
+        return majorMinorExact[-1]
+    }
+    def prefix = "+${majorMinor}."
+    def patchCandidates = allVersions.findAll { it.contains(prefix) }
+    if (!patchCandidates) {
+        return null
+    }
+    def byPatch = patchCandidates.collect { v ->
+        def suffix = v.substring(v.indexOf(prefix) + prefix.length)
+        def patch = suffix.split("[^0-9]")[0]
+        def patchNum = patch ? Integer.parseInt(patch) : -1
+        [version: v, patch: patchNum]
+    }.sort { a, b -> a.patch <=> b.patch }
+    return byPatch[-1].version
+}
+
+def resolveVersionFor = { String prefix, String mcVersion ->
+    def override = versionProp(prefix, mcVersion)
+    if (override) {
+        return override
+    }
+    if (prefix == "yarn") {
+        return resolveYarnVersion(mcVersion)
+    }
+    if (prefix == "loader") {
+        return resolveLoaderVersion(mcVersion)
+    }
+    if (prefix == "fabric") {
+        return resolveFabricApiVersion(mcVersion)
+    }
+    return project.findProperty(prefix)
+}
+
+def requireVersion = { String label, String value, String mcVersion ->
+    if (!value) {
+        throw new GradleException("Could not resolve ${label} for Minecraft ${mcVersion}. Add ${label}_${versionKey(mcVersion)} to gradle.properties.")
+    }
+    return value
+}
+
 version = project.mod_version
 group = project.maven_group
 
-base {
-    archivesName = project.archives_base_name
-}
+def resolvedYarnMappings = requireVersion("yarn", resolveVersionFor("yarn", project.minecraft_version), project.minecraft_version)
+def resolvedLoaderVersion = requireVersion("loader", resolveVersionFor("loader", project.minecraft_version), project.minecraft_version)
+def resolvedFabricApiVersion = requireVersion("fabric", resolveVersionFor("fabric", project.minecraft_version), project.minecraft_version)
 
 loom {
     splitEnvironmentSourceSets()
@@ -38,10 +138,10 @@ repositories {
 dependencies {
     // To change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    mappings "net.fabricmc:yarn:${resolvedYarnMappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${resolvedLoaderVersion}"
 
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${resolvedFabricApiVersion}"
 
     compileOnly "org.projectlombok:lombok:1.18.42"
     annotationProcessor "org.projectlombok:lombok:1.18.42"
@@ -53,17 +153,17 @@ dependencies {
 processResources {
     inputs.property "version", project.version
     inputs.property "minecraft_version", project.minecraft_version
-    inputs.property "loader_version", project.loader_version
+    inputs.property "loader_version", resolvedLoaderVersion
     filteringCharset "UTF-8"
 
     filesMatching("fabric.mod.json") {
         expand "version": project.version,
                 "minecraft_version": project.minecraft_version,
-                "loader_version": project.loader_version
+                "loader_version": resolvedLoaderVersion
     }
 }
 
-def targetJavaVersion = 21
+def targetJavaVersion = 17
 tasks.withType(JavaCompile).configureEach {
     // ensure that the encoding is set to UTF-8, no matter what the system default is
     // this fixes some edge cases with special characters not displaying correctly
@@ -73,6 +173,21 @@ tasks.withType(JavaCompile).configureEach {
     if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
         it.options.release.set(targetJavaVersion)
     }
+}
+
+def gradlew = org.gradle.internal.os.OperatingSystem.current().isWindows() ? "gradlew.bat" : "./gradlew"
+def buildTasks = mcVersions.collect { mcVersion ->
+    tasks.register("buildMc${versionKey(mcVersion)}", Exec) {
+        group = "build"
+        def mc = mcVersion
+        commandLine gradlew, "-Pminecraft_version=${mc}", "build"
+    }
+}
+
+tasks.register("buildAll") {
+    group = "build"
+    description = "Builds the mod for all Minecraft versions in minecraft_versions."
+    dependsOn(buildTasks)
 }
 
 java {

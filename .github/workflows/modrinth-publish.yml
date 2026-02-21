@@ -1,0 +1,79 @@
+name: Publish to Modrinth
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      mc_versions: ${{ steps.versions.outputs.mc_versions }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Read Minecraft versions
+        id: versions
+        run: |
+          echo "mc_versions=$(python3 - <<'PY'
+          import json
+          import pathlib
+          data = pathlib.Path("gradle.properties").read_text(encoding="utf-8")
+          def get(name):
+              for line in data.splitlines():
+                  if line.startswith(name + "="):
+                      return line.split("=", 1)[1].strip()
+              return ""
+          versions = [v.strip() for v in get("minecraft_versions").split(",") if v.strip()]
+          print(json.dumps(versions))
+          PY
+          )" >> "$GITHUB_OUTPUT"
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+      - name: Build all Minecraft versions
+        run: |
+          chmod +x ./gradlew
+          ./gradlew -Pmod_version=${{ github.event.release.tag_name }} buildAll
+      - name: Upload jars
+        uses: actions/upload-artifact@v4
+        with:
+          name: jars
+          path: build/libs/*.jar
+  publish:
+    needs: [prepare-matrix, build]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mc: ${{ fromJson(needs.prepare-matrix.outputs.mc_versions) }}
+    steps:
+      - name: Download jars
+        uses: actions/download-artifact@v4
+        with:
+          name: jars
+          path: build/libs
+      - name: Publish to Modrinth
+        uses: cloudnode-pro/modrinth-publish@v2
+        with:
+          token: ${{ secrets.MODRINTH_TOKEN }}
+          project: ${{ secrets.MODRINTH_PROJECT_ID }}
+          name: ${{ github.event.release.name }} (MC ${{ matrix.mc }})
+          version: ${{ github.event.release.tag_name }}+mc${{ matrix.mc }}
+          changelog: ${{ github.event.release.body }}
+          loaders: |-
+            fabric
+          game-versions: |-
+            ${{ matrix.mc }}
+          files: build/libs/*-mc${{ matrix.mc }}-${{ github.event.release.tag_name }}.jar

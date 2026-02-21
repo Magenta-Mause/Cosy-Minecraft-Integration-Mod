@@ -21,7 +21,7 @@ public final class MetricsCollector {
                     ? "Thundering" : overworld.isRaining() ? "Raining" : "Clear");
         }
 
-        long[] tickTimesNs = server.getTickTimes();
+        long[] tickTimesNs = TickTimeTracker.snapshotTickTimesNs();
         if (tickTimesNs != null && tickTimesNs.length > 0) {
             double avgTickNs = Arrays.stream(tickTimesNs).average().orElse(0.0);
             double mspt = avgTickNs / 1_000_000.0;

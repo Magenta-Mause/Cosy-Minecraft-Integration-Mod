@@ -25,28 +25,8 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Build
-        run: ./gradlew clean build
-
-      - name: Locate mod jar
-        id: jars
-        shell: bash
-        run: |
-          set -euo pipefail
-          ls -la build/libs
-
-          # Pick the distributable jar (exclude dev + sources jars)
-          MAIN_JAR="$(ls -1 build/libs/*.jar | grep -vE '(-dev|-sources)\.jar$' | head -n 1 || true)"
-          if [[ -z "${MAIN_JAR}" ]]; then
-            echo "No main jar found in build/libs (excluding -dev and -sources)." >&2
-            exit 1
-          fi
-
-          # Optionally also include sources jar if present
-          SOURCES_JAR="$(ls -1 build/libs/*-sources.jar 2>/dev/null | head -n 1 || true)"
-
-          echo "main_jar=${MAIN_JAR}" >> "$GITHUB_OUTPUT"
-          echo "sources_jar=${SOURCES_JAR}" >> "$GITHUB_OUTPUT"
+      - name: Build all Minecraft versions
+        run: ./gradlew clean buildAll
 
       - name: Compute release tag/name
         id: rel
@@ -65,5 +45,4 @@ jobs:
           name: ${{ steps.rel.outputs.name }}
           generate_release_notes: true
           files: |
-            ${{ steps.jars.outputs.main_jar }}
-            ${{ steps.jars.outputs.sources_jar }}
+            build/libs/*.jar
