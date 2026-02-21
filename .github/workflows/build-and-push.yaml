@@ -25,26 +25,28 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Build all versions
-        run: ./gradlew chiseledBuild
+      - name: Build
+        run: ./gradlew clean build
 
-      - name: Collect jars
+      - name: Locate mod jar
         id: jars
         shell: bash
         run: |
           set -euo pipefail
-
-          # Collect distributable jars from all version builds into root build/libs
-          mkdir -p build/libs
-          find versions/*/build/libs -name '*.jar' \
-            ! -name '*-dev.jar' ! -name '*-sources.jar' \
-            -exec cp {} build/libs/ \;
-
           ls -la build/libs
-          if [ -z "$(ls -A build/libs/*.jar 2>/dev/null)" ]; then
-            echo "No jars found." >&2
+
+          # Pick the distributable jar (exclude dev + sources jars)
+          MAIN_JAR="$(ls -1 build/libs/*.jar | grep -vE '(-dev|-sources)\.jar$' | head -n 1 || true)"
+          if [[ -z "${MAIN_JAR}" ]]; then
+            echo "No main jar found in build/libs (excluding -dev and -sources)." >&2
             exit 1
           fi
+
+          # Optionally also include sources jar if present
+          SOURCES_JAR="$(ls -1 build/libs/*-sources.jar 2>/dev/null | head -n 1 || true)"
+
+          echo "main_jar=${MAIN_JAR}" >> "$GITHUB_OUTPUT"
+          echo "sources_jar=${SOURCES_JAR}" >> "$GITHUB_OUTPUT"
 
       - name: Compute release tag/name
         id: rel
@@ -63,4 +65,5 @@ jobs:
           name: ${{ steps.rel.outputs.name }}
           generate_release_notes: true
           files: |
-            build/libs/*.jar
+            ${{ steps.jars.outputs.main_jar }}
+            ${{ steps.jars.outputs.sources_jar }}
