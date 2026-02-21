@@ -25,25 +25,11 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
+      - name: Make upload.py executable
+        run: chmod +x upload.py
+
       - name: Build all Minecraft versions
         run: ./gradlew clean buildAll
-
-      - name: Read Minecraft versions
-        id: versions
-        run: |
-          echo "mc_versions=$(python3 - <<'PY'
-          import json
-          import pathlib
-          data = pathlib.Path("gradle.properties").read_text(encoding="utf-8")
-          def get(name):
-              for line in data.splitlines():
-                  if line.startswith(name + "="):
-                      return line.split("=", 1)[1].strip()
-              return ""
-          versions = [v.strip() for v in get("minecraft_versions").split(",") if v.strip()]
-          print(json.dumps(versions))
-          PY
-          )" >> "$GITHUB_OUTPUT"
 
       - name: Compute release tag/name
         id: rel
@@ -63,38 +49,3 @@ jobs:
           generate_release_notes: true
           files: |
             build/libs/*.jar
-
-      - name: Publish to Modrinth (all MC versions)
-        env:
-          MC_VERSIONS: ${{ steps.versions.outputs.mc_versions }}
-          RELEASE_NAME: ${{ steps.rel.outputs.name }}
-          RELEASE_TAG: ${{ steps.rel.outputs.tag }}
-          RELEASE_NOTES: ${{ steps.rel.outputs.name }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          import subprocess
-          mc_versions = json.loads(os.environ["MC_VERSIONS"])
-          name = os.environ["RELEASE_NAME"]
-          tag = os.environ["RELEASE_TAG"]
-          notes = os.environ["RELEASE_NOTES"]
-          for mc in mc_versions:
-              jar = f"build/libs/*-mc{mc}-{tag}.jar"
-              cmd = [
-                  "bash",
-                  "-lc",
-                  " ".join([
-                      "npx", "modrinth", "publish",
-                      "--token", "${MODRINTH_TOKEN}",
-                      "--project-id", "${MODRINTH_PROJECT_ID}",
-                      "--name", f\"'{name} (MC {mc})'\",
-                      "--version-number", f\"'{tag}+mc{mc}'\",
-                      "--changelog", f\"'{notes}'\",
-                      "--loaders", "fabric",
-                      "--game-versions", mc,
-                      jar,
-                  ]),
-              ]
-              subprocess.check_call(cmd)
-          PY
