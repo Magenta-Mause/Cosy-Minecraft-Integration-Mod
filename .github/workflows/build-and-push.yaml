@@ -64,37 +64,14 @@ jobs:
           files: |
             build/libs/*.jar
 
-      - name: Publish to Modrinth (all MC versions)
+      - name: Publish to Modrinth
+        uses: Kira-NT/mc-publish@v3.3
         env:
-          MC_VERSIONS: ${{ steps.versions.outputs.mc_versions }}
-          RELEASE_NAME: ${{ steps.rel.outputs.name }}
-          RELEASE_TAG: ${{ steps.rel.outputs.tag }}
-          RELEASE_NOTES: ${{ steps.rel.outputs.name }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          import subprocess
-          mc_versions = json.loads(os.environ["MC_VERSIONS"])
-          name = os.environ["RELEASE_NAME"]
-          tag = os.environ["RELEASE_TAG"]
-          notes = os.environ["RELEASE_NOTES"]
-          for mc in mc_versions:
-              jar = f"build/libs/*-mc{mc}-{tag}.jar"
-              cmd = [
-                  "bash",
-                  "-lc",
-                  " ".join([
-                      "npx", "modrinth", "publish",
-                      "--token", "${MODRINTH_TOKEN}",
-                      "--project-id", "${MODRINTH_PROJECT_ID}",
-                      "--name", f\"'{name} (MC {mc})'\",
-                      "--version-number", f\"'{tag}+mc{mc}'\",
-                      "--changelog", f\"'{notes}'\",
-                      "--loaders", "fabric",
-                      "--game-versions", mc,
-                      jar,
-                  ]),
-              ]
-              subprocess.check_call(cmd)
-          PY
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+        with:
+          modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: |
+            build/libs/*.jar
+          game-version-filter: releases
+          verbose: true
