@@ -1,3 +1,7 @@
+# Environment / secrets (keep .env.example tracked)
+.env
+.env.local
+
 # User-specific stuff
 .idea/
 
