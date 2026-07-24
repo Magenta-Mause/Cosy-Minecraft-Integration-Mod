@@ -143,11 +143,11 @@ dependencies {
 
     modImplementation "net.fabricmc.fabric-api:fabric-api:${resolvedFabricApiVersion}"
 
-    compileOnly "org.projectlombok:lombok:1.18.42"
-    annotationProcessor "org.projectlombok:lombok:1.18.42"
+    compileOnly "org.projectlombok:lombok:1.18.46"
+    annotationProcessor "org.projectlombok:lombok:1.18.46"
 
-    testCompileOnly "org.projectlombok:lombok:1.18.42"
-    testAnnotationProcessor "org.projectlombok:lombok:1.18.42"
+    testCompileOnly "org.projectlombok:lombok:1.18.46"
+    testAnnotationProcessor "org.projectlombok:lombok:1.18.46"
 }
 
 processResources {
