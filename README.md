@@ -3,10 +3,11 @@
 > A server-side Fabric mod that periodically collects basic Minecraft server metrics and pushes them to the [Cosy](https://github.com/Magenta-Mause/Cosy) API over HTTP.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/Magenta-Mause/Cosy-Minecraft-Integration-Mod)](../../releases)
 [![Build, Release & Publish](https://github.com/Magenta-Mause/Cosy-Minecraft-Integration-Mod/actions/workflows/build-and-push.yaml/badge.svg)](https://github.com/Magenta-Mause/Cosy-Minecraft-Integration-Mod/actions/workflows/build-and-push.yaml)
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.18%20%E2%80%93%201.21.11-brightgreen.svg)](https://modmuss50.me/fabric.html)
 [![Fabric](https://img.shields.io/badge/Mod%20Loader-Fabric-dbd0b4.svg)](https://fabricmc.net/)
-[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://adoptium.net/)
+[![Java](https://img.shields.io/badge/Java-17%20%7C%2021-orange.svg)](https://adoptium.net/)
 
 ---
 
@@ -28,7 +29,8 @@ it is misconfigured or the Cosy API is unreachable, the Minecraft server keeps r
 ### Key features
 
 - Collects metrics directly from the running server (no external polling).
-- Pushes metrics to the Cosy API on a configurable interval over plain HTTP.
+- Pushes metrics to the Cosy API on a configurable interval over HTTP(S) — the scheme comes from
+  `COSY_BASE_URL`; the platform default is plain HTTP inside the Docker network.
 - Runs a one-time connection test at startup and logs the result.
 - Fully configured via environment variables — a natural fit for containerized hosting.
 - Non-blocking: HTTP calls are asynchronous and errors are suppressed to avoid log spam.
@@ -54,14 +56,15 @@ Nullable fields are omitted when unavailable.
 |---|---|
 | `playerCount` | Current number of online players |
 | `currentDayTime` | Overworld time of day (`timeOfDay % 24000`) |
-| `fullTime` | Raw overworld world time |
+| `fullTime` | Overworld time of day, un-modulo'd (`timeOfDay`, the same source as `currentDayTime`) |
 | `currentWeather` | `Clear`, `Raining`, or `Thundering` |
 | `mspt` | Average milliseconds per tick (rolling window of 100 ticks) |
 | `tps` | Ticks per second, derived from MSPT and capped at 20 |
 | `msSinceEpoch` | System time in milliseconds when the sample was taken |
 
-Overworld fields are included only when the overworld is loaded, and `mspt`/`tps` only once tick
-timings are available.
+Overworld fields are included only when the overworld is loaded. `mspt`/`tps` are **always** included:
+they are the mean over a fixed 100-tick ring buffer, so during the first ~100 ticks after start the mean
+is diluted by still-empty slots — `mspt` reads artificially low and `tps` sits pinned at the 20 cap.
 
 ---
 
@@ -70,7 +73,8 @@ timings are available.
 **To build the mod:**
 
 - A JDK (Temurin/OpenJDK). The mod compiles to **Java 17** bytecode (`targetJavaVersion = 17`), and the
-  CI pipeline builds with **Temurin JDK 21**. JDK 21 is recommended.
+  CI pipeline builds with **Temurin JDK 21**. Use **JDK 21** — newer JDKs (26) are not supported by the
+  current Loom/Gradle combination and fail the build.
 - The bundled Gradle wrapper (`./gradlew`) — no separate Gradle install needed. Uses the **Fabric Loom**
   plugin.
 - Network access on first build: the Gradle build resolves Yarn/Loader/Fabric API versions from the
@@ -80,8 +84,13 @@ timings are available.
 
 - A **Fabric dedicated server** for a supported Minecraft version (1.18 – 1.21.11; the default target is
   **1.21.11**).
-- The matching **Fabric Loader** (`>= 0.18.4` for the default target) and the **Fabric API** mod.
-- **Java 21** runtime — required by modern Minecraft (1.20.5+).
+- A recent **Fabric Loader** and the **Fabric API** mod. The exact minimum is baked in at build time
+  (resolved from the Fabric meta service), so it moves with the build rather than being pinned here —
+  JARs built today require Fabric Loader **>= 0.19.3**. Check `fabric.mod.json` inside your JAR for the
+  authoritative requirement. Any recent **Fabric API** build for your Minecraft version works; the mod
+  declares `"fabric-api": "*"`.
+- **Java 17** runtime for Minecraft 1.18 – 1.20.4, **Java 21** for 1.20.5+. The mod itself targets
+  Java 17 bytecode, so it runs on either — the floor comes from Minecraft, not from this mod.
 - Reachable **Cosy backend** (see [Configuration](#configuration)).
 
 ---
@@ -204,7 +213,7 @@ Cosy-Minecraft-Integration-Mod/
 ├── build.gradle                    # Fabric Loom build; multi-version resolution logic
 ├── gradle.properties               # Minecraft / Fabric / mod versions
 ├── settings.gradle                 # Fabric maven plugin repositories
-├── upload.py                       # CI helper: publishes built JARs to Modrinth
+├── upload.py                       # Modrinth publish script — not wired into CI yet (unused)
 ├── LICENSE                         # MIT
 ├── .github/workflows/              # CI: build+release; issue redirect
 └── src/
@@ -261,8 +270,12 @@ Use `./gradlew tasks` to list all available tasks.
   dependencies.
 - **Gson** (provided transitively by Minecraft) — JSON serialization of the metrics payload.
 - **Lombok** (`compileOnly` + `annotationProcessor`) — the `@Builder` on `MetricsDto`.
-- Metric versions (Yarn mappings, Loader, Fabric API) are resolved automatically per Minecraft version
-  from the Fabric meta service, with optional overrides in `gradle.properties`.
+- Toolchain versions (Yarn mappings, Fabric Loader, Fabric API) are resolved automatically per
+  Minecraft version from the Fabric meta service. Overrides go in `gradle.properties` under the keys
+  `yarn`/`loader`/`fabric`, optionally suffixed with the Minecraft version (dots as underscores) —
+  e.g. `loader_1_21_11`, `yarn_1_21_11`, `fabric_1_21_11`. Note that the existing
+  `loader_version`/`yarn_mappings`/`fabric_version` keys are **not** consulted by the build and have no
+  effect (tracked separately).
 
 ---
 
