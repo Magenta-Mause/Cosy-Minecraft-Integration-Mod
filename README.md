@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/Magenta-Mause/Cosy-Minecraft-Integration-Mod)](../../releases)
-[![Build, Release & Publish](https://github.com/Magenta-Mause/Cosy-Minecraft-Integration-Mod/actions/workflows/build-and-push.yaml/badge.svg)](https://github.com/Magenta-Mause/Cosy-Minecraft-Integration-Mod/actions/workflows/build-and-push.yaml)
+[![Build, Release & Publish (main)](https://github.com/Magenta-Mause/Cosy-Minecraft-Integration-Mod/actions/workflows/build-and-push.yaml/badge.svg)](https://github.com/Magenta-Mause/Cosy-Minecraft-Integration-Mod/actions/workflows/build-and-push.yaml)
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.18%20%E2%80%93%201.21.11-brightgreen.svg)](https://modmuss50.me/fabric.html)
 [![Fabric](https://img.shields.io/badge/Mod%20Loader-Fabric-dbd0b4.svg)](https://fabricmc.net/)
 [![Java](https://img.shields.io/badge/Java-17%20%7C%2021-orange.svg)](https://adoptium.net/)
@@ -41,7 +41,8 @@ it is misconfigured or the Cosy API is unreachable, the Minecraft server keeps r
 | Repository | Description |
 |---|---|
 | [Magenta-Mause/Cosy](https://github.com/Magenta-Mause/Cosy) | Main Cosy project (download / meta repo) |
-| [Magenta-Mause/Cosy-Backend](https://github.com/Magenta-Mause/Cosy-Backend) | Cosy backend — exposes the API this mod talks to |
+| [Magenta-Mause/Cosy-Backend](https://github.com/Magenta-Mause/Cosy-Backend) | Cosy backend — exposes the API this mod talks to and injects this mod's environment variables |
+| [Magenta-Mause/Cosy-Frontend](https://github.com/Magenta-Mause/Cosy-Frontend) | Web dashboard where the metrics this mod pushes are displayed |
 | [Magenta-Mause/Cosy-Docs](https://github.com/Magenta-Mause/Cosy-Docs) | Official Cosy documentation ([cosy-hosting.net](https://cosy-hosting.net)) |
 | [Magenta-Mause/.github](https://github.com/Magenta-Mause/.github) | Org-wide community health files |
 
@@ -288,12 +289,14 @@ Full Cosy documentation lives at **[cosy-hosting.net](https://cosy-hosting.net)*
 
 ## Contributing
 
-Contributions are welcome! Organization-wide contribution guidelines and community health files are
-maintained in the [Magenta-Mause/.github](https://github.com/Magenta-Mause/.github) repository.
+Contributions are welcome! Organization-wide community health files live in the
+[Magenta-Mause/.github](https://github.com/Magenta-Mause/.github) repository — a `CONTRIBUTING.md`
+has not landed there yet, so until it does, [Development workflow](#development-workflow) below is the
+authoritative guide.
 
 **Reporting bugs & requesting features:** issues for this repository are tracked centrally in the main
 Cosy repository. Please open new issues at
-**[Magenta-Mause/cosy → New issue](https://github.com/Magenta-Mause/cosy/issues/new/choose)**. (Issues
+**[Magenta-Mause/Cosy → New issue](https://github.com/Magenta-Mause/Cosy/issues/new/choose)**. (Issues
 opened directly here are automatically redirected and closed by a workflow.)
 
 For local development setup, see [Development workflow](#development-workflow) above.
@@ -319,7 +322,7 @@ Released under the **MIT License**. See [`LICENSE`](LICENSE) for the full text.
 
 - **Documentation:** [cosy-hosting.net](https://cosy-hosting.net)
 - **Community & support:** [Cosy Discord](https://discord.gg/nNtZJnSpSk)
-- **Issues:** [Magenta-Mause/cosy](https://github.com/Magenta-Mause/cosy/issues/new/choose)
+- **Issues:** [Magenta-Mause/Cosy](https://github.com/Magenta-Mause/Cosy/issues/new/choose)
 
 ---
 
