@@ -6,7 +6,7 @@
   "description": "",
   "authors": [],
   "contact": {},
-  "license": "All-Rights-Reserved",
+  "license": "MIT",
   "icon": "assets/cosyintegrationmod/icon.png",
   "environment": "server",
   "entrypoints": {
