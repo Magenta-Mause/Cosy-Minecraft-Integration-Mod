@@ -1,16 +1,15 @@
 plugins {
-    id 'fabric-loom' version '1.15-SNAPSHOT'
+    // Two flavours of the same Loom release: the remapping plugin for the obfuscated
+    // 1.x versions, and the plain one for the unobfuscated 26.x versions. Which one is
+    // applied depends on the Minecraft version being built (see below).
+    id 'net.fabricmc.fabric-loom-remap' version '1.17.17' apply false
+    id 'net.fabricmc.fabric-loom' version '1.17.17' apply false
     id 'maven-publish'
 }
 
 import groovy.json.JsonSlurper
 import groovy.xml.XmlSlurper
 import java.net.URLEncoder
-
-base {
-    // Include MC version in the jar name so multi-version builds don't overwrite each other.
-    archivesName = "${project.archives_base_name}-mc${project.minecraft_version}"
-}
 
 def versionKey = { String mcVersion -> mcVersion.replace(".", "_") }
 def mcVersions = (project.findProperty("minecraft_versions") ?: project.minecraft_version)
@@ -38,12 +37,29 @@ def fetchXml = { String url ->
     }
 }
 
-def resolveYarnVersion = { String mcVersion ->
-    def list = fetchJson("${metaBase}/v2/versions/yarn/${URLEncoder.encode(mcVersion, "UTF-8")}")
-    def stable = list.findAll { it.stable }
-    def pick = (stable ? stable : list)[0]
-    return pick?.version
+// Minecraft 26.x and later ship unobfuscated, so Mojang no longer publishes a
+// mappings artifact for them and Loom needs no mappings dependency at all.
+// Everything up to 1.21.11 is still obfuscated and needs official Mojang mappings.
+def isObfuscated = { String mcVersion ->
+    def manifest = fetchJson("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
+    def entry = manifest.versions.find { it.id == mcVersion }
+    if (!entry) {
+        throw new GradleException("Minecraft ${mcVersion} is not in Mojang's version manifest.")
+    }
+    return fetchJson(entry.url).downloads?.client_mappings != null
 }
+
+def obfuscated = isObfuscated(project.minecraft_version)
+apply plugin: obfuscated ? "net.fabricmc.fabric-loom-remap" : "net.fabricmc.fabric-loom"
+
+base {
+    // Include MC version in the jar name so multi-version builds don't overwrite each other.
+    archivesName = "${project.archives_base_name}-mc${project.minecraft_version}"
+}
+
+// The day-time accessor differs between the pre-26 levels and the 26.x world clock;
+// pick the matching compat variant instead of branching at runtime.
+sourceSets.main.java.srcDir obfuscated ? "src/compat/pre26/java" : "src/compat/mc26/java"
 
 def resolveLoaderVersion = { String mcVersion ->
     def list = fetchJson("${metaBase}/v2/versions/loader/${URLEncoder.encode(mcVersion, "UTF-8")}")
@@ -84,9 +100,6 @@ def resolveVersionFor = { String prefix, String mcVersion ->
     if (override) {
         return override
     }
-    if (prefix == "yarn") {
-        return resolveYarnVersion(mcVersion)
-    }
     if (prefix == "loader") {
         return resolveLoaderVersion(mcVersion)
     }
@@ -106,7 +119,6 @@ def requireVersion = { String label, String value, String mcVersion ->
 version = project.mod_version
 group = project.maven_group
 
-def resolvedYarnMappings = requireVersion("yarn", resolveVersionFor("yarn", project.minecraft_version), project.minecraft_version)
 def resolvedLoaderVersion = requireVersion("loader", resolveVersionFor("loader", project.minecraft_version), project.minecraft_version)
 def resolvedFabricApiVersion = requireVersion("fabric", resolveVersionFor("fabric", project.minecraft_version), project.minecraft_version)
 
@@ -138,10 +150,15 @@ repositories {
 dependencies {
     // To change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${resolvedYarnMappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${resolvedLoaderVersion}"
 
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${resolvedFabricApiVersion}"
+    // Obfuscated versions need mappings and remapped mod dependencies; the unobfuscated
+    // 26.x jars are already named, so Loom has no remapping configurations at all.
+    def modConfiguration = obfuscated ? "modImplementation" : "implementation"
+    if (obfuscated) {
+        mappings loom.officialMojangMappings()
+    }
+    add(modConfiguration, "net.fabricmc:fabric-loader:${resolvedLoaderVersion}")
+    add(modConfiguration, "net.fabricmc.fabric-api:fabric-api:${resolvedFabricApiVersion}")
 
     compileOnly "org.projectlombok:lombok:1.18.46"
     annotationProcessor "org.projectlombok:lombok:1.18.46"

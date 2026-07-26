@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/Magenta-Mause/Cosy-Minecraft-Integration-Mod)](../../releases)
 [![Build, Release & Publish (main)](https://github.com/Magenta-Mause/Cosy-Minecraft-Integration-Mod/actions/workflows/build-and-push.yaml/badge.svg)](https://github.com/Magenta-Mause/Cosy-Minecraft-Integration-Mod/actions/workflows/build-and-push.yaml)
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.18%20%E2%80%93%201.21.11-brightgreen.svg)](https://modmuss50.me/fabric.html)
+[![Minecraft](https://img.shields.io/badge/Minecraft-1.18%20%E2%80%93%2026.2-brightgreen.svg)](https://modmuss50.me/fabric.html)
 [![Fabric](https://img.shields.io/badge/Mod%20Loader-Fabric-dbd0b4.svg)](https://fabricmc.net/)
 [![Java](https://img.shields.io/badge/Java-17%20%7C%2021-orange.svg)](https://adoptium.net/)
 
@@ -34,7 +34,7 @@ it is misconfigured or the Cosy API is unreachable, the Minecraft server keeps r
 - Runs a one-time connection test at startup and logs the result.
 - Fully configured via environment variables — a natural fit for containerized hosting.
 - Non-blocking: HTTP calls are asynchronous and errors are suppressed to avoid log spam.
-- Multi-version build support (Minecraft 1.18 through 1.21.11) driven by `gradle.properties`.
+- Multi-version build support (Minecraft 1.18 through 26.2) driven by `gradle.properties`.
 
 ### Related repositories
 
@@ -73,25 +73,27 @@ is diluted by still-empty slots — `mspt` reads artificially low and `tps` sits
 
 **To build the mod:**
 
-- A JDK (Temurin/OpenJDK). The mod compiles to **Java 17** bytecode (`targetJavaVersion = 17`), and the
-  CI pipeline builds with **Temurin JDK 21**. Use **JDK 21** — newer JDKs (26) are not supported by the
-  current Loom/Gradle combination and fail the build.
+- A JDK (Temurin/OpenJDK). The mod compiles to **Java 17** bytecode (`targetJavaVersion = 17`), but
+  Minecraft 26.x is itself compiled for Java 25, so building the full version matrix needs **JDK 25**
+  — which is what the CI pipeline uses.
 - The bundled Gradle wrapper (`./gradlew`) — no separate Gradle install needed. Uses the **Fabric Loom**
   plugin.
-- Network access on first build: the Gradle build resolves Yarn/Loader/Fabric API versions from the
-  [Fabric meta service](https://meta.fabricmc.net) at configuration time.
+- Network access on first build: the Gradle build resolves Loader/Fabric API versions from the
+  [Fabric meta service](https://meta.fabricmc.net) and the mappings situation from Mojang's version
+  manifest at configuration time.
 
 **To run the mod:**
 
-- A **Fabric dedicated server** for a supported Minecraft version (1.18 – 1.21.11; the default target is
-  **1.21.11**).
+- A **Fabric dedicated server** for a supported Minecraft version (1.18 – 26.2; the default target is
+  **26.2**).
 - A recent **Fabric Loader** and the **Fabric API** mod. The exact minimum is baked in at build time
   (resolved from the Fabric meta service), so it moves with the build rather than being pinned here —
   JARs built today require Fabric Loader **>= 0.19.3**. Check `fabric.mod.json` inside your JAR for the
   authoritative requirement. Any recent **Fabric API** build for your Minecraft version works; the mod
   declares `"fabric-api": "*"`.
-- **Java 17** runtime for Minecraft 1.18 – 1.20.4, **Java 21** for 1.20.5+. The mod itself targets
-  Java 17 bytecode, so it runs on either — the floor comes from Minecraft, not from this mod.
+- **Java 17** runtime for Minecraft 1.18 – 1.20.4, **Java 21** for 1.20.5 – 1.21.11, **Java 25** for
+  26.x. The mod itself targets Java 17 bytecode, so it runs on all of them — the floor comes from
+  Minecraft, not from this mod.
 - Reachable **Cosy backend** (see [Configuration](#configuration)).
 
 ---
@@ -105,7 +107,7 @@ Build the default Minecraft version (`minecraft_version` in `gradle.properties`)
 ```
 
 The resulting mod JAR is written to `build/libs/`. Use the file **without** a `-sources` (or `-dev`)
-suffix — its name includes the Minecraft version, e.g. `cosyintegrationmod-mc1.21.11-1.0.jar`.
+suffix — its name includes the Minecraft version, e.g. `cosyintegrationmod-mc26.2-1.0.jar`.
 
 To build for **every** Minecraft version listed in `minecraft_versions`:
 
@@ -214,7 +216,6 @@ Cosy-Minecraft-Integration-Mod/
 ├── build.gradle                    # Fabric Loom build; multi-version resolution logic
 ├── gradle.properties               # Minecraft / Fabric / mod versions
 ├── settings.gradle                 # Fabric maven plugin repositories
-├── upload.py                       # Modrinth publish script — not wired into CI yet (unused)
 ├── LICENSE                         # MIT
 ├── .github/workflows/              # CI: build+release; issue redirect
 └── src/
@@ -231,6 +232,9 @@ Cosy-Minecraft-Integration-Mod/
     │   └── resources/
     │       ├── fabric.mod.json
     │       └── *.mixins.json
+    ├── compat/                         # Per-era variants of LevelTime; one is added to
+    │   ├── pre26/                      # the main source set depending on the target
+    │   └── mc26/                       # Minecraft version
     └── client/resources/               # Client-side mixin config (unused at runtime; server-only mod)
 ```
 
@@ -271,12 +275,16 @@ Use `./gradlew tasks` to list all available tasks.
   dependencies.
 - **Gson** (provided transitively by Minecraft) — JSON serialization of the metrics payload.
 - **Lombok** (`compileOnly` + `annotationProcessor`) — the `@Builder` on `MetricsDto`.
-- Toolchain versions (Yarn mappings, Fabric Loader, Fabric API) are resolved automatically per
-  Minecraft version from the Fabric meta service. Overrides go in `gradle.properties` under the keys
-  `yarn`/`loader`/`fabric`, optionally suffixed with the Minecraft version (dots as underscores) —
-  e.g. `loader_1_21_11`, `yarn_1_21_11`, `fabric_1_21_11`. Note that the existing
-  `loader_version`/`yarn_mappings`/`fabric_version` keys are **not** consulted by the build and have no
-  effect (tracked separately).
+- Toolchain versions (Fabric Loader, Fabric API) are resolved automatically per Minecraft version from
+  the Fabric meta service. Overrides go in `gradle.properties` under the keys `loader`/`fabric`,
+  optionally suffixed with the Minecraft version (dots as underscores) — e.g. `loader_1_21_11`,
+  `fabric_26_2`. Note that the existing `loader_version`/`fabric_version` keys are **not** consulted by
+  the build and have no effect (tracked separately).
+- Mappings depend on the era. Minecraft up to 1.21.11 is obfuscated and is built against **Mojang's
+  official mappings** via the remapping Loom plugin; Minecraft 26.x ships unobfuscated, needs no
+  mappings at all, and is built with the plain Loom plugin. The build picks the plugin, the mod
+  dependency configuration and the matching `src/compat/...` variant of `LevelTime` automatically from
+  Mojang's version manifest.
 
 ---
 

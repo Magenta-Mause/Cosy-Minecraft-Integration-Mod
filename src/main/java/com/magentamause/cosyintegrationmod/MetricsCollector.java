@@ -1,7 +1,7 @@
 package com.magentamause.cosyintegrationmod;
 
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.level.ServerLevel;
 
 import java.util.Arrays;
 
@@ -10,11 +10,11 @@ public final class MetricsCollector {
     public MetricsDto collect(MinecraftServer server) {
         MetricsDto.MetricsDtoBuilder builder = MetricsDto.builder();
 
-        builder.playerCount(server.getCurrentPlayerCount());
+        builder.playerCount(server.getPlayerCount());
 
-        ServerWorld overworld = server.getOverworld();
+        ServerLevel overworld = server.overworld();
         if (overworld != null) {
-            long timeOfDay = overworld.getTimeOfDay();
+            long timeOfDay = LevelTime.dayTime(overworld);
             builder.currentDayTime(timeOfDay % 24000L);
             builder.fullTime(timeOfDay);
             builder.currentWeather(overworld.isThundering()
