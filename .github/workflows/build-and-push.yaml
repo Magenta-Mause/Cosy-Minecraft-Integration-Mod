@@ -17,7 +17,7 @@ jobs:
 
       # Minecraft 26.x is compiled for Java 25, so the JDK has to be at least that new.
       - name: Set up Java 25
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v5.6.0
         with:
           distribution: temurin
           java-version: "25"
