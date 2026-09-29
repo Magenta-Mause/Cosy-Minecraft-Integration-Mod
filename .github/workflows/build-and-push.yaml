@@ -47,3 +47,10 @@ jobs:
           generate_release_notes: true
           files: |
             build/libs/*.jar
+
+      # Uploads only the JARs Modrinth does not have yet, so a push publishes newly added versions.
+      - name: Publish new versions to Modrinth
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
+        run: python3 .github/scripts/publish_modrinth.py
